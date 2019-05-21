@@ -1,0 +1,22 @@
+[INFO  - 2019-05-21T06:57:35.449Z] GhostDriver - Main - running on port 62761
+[INFO  - 2019-05-21T06:57:36.338Z] Session [b71326e0-7b95-11e9-92bd-134dc79bb8fe] - page.settings - {"XSSAuditingEnabled":false,"javascriptCanCloseWindows":true,"javascriptCanOpenWindows":true,"javascriptEnabled":true,"loadImages":true,"localToRemoteUrlAccessEnabled":false,"userAgent":"Mozilla/5.0 (Macintosh; Intel Mac OS X) AppleWebKit/538.1 (KHTML, like Gecko) PhantomJS/2.1.1 Safari/538.1","webSecurityEnabled":true}
+[INFO  - 2019-05-21T06:57:36.338Z] Session [b71326e0-7b95-11e9-92bd-134dc79bb8fe] - page.customHeaders:  - {}
+[INFO  - 2019-05-21T06:57:36.338Z] Session [b71326e0-7b95-11e9-92bd-134dc79bb8fe] - Session.negotiatedCapabilities - {"browserName":"phantomjs","version":"2.1.1","driverName":"ghostdriver","driverVersion":"1.2.0","platform":"mac-unknown-64bit","javascriptEnabled":true,"takesScreenshot":true,"handlesAlerts":false,"databaseEnabled":false,"locationContextEnabled":false,"applicationCacheEnabled":false,"browserConnectionEnabled":false,"cssSelectorsEnabled":true,"webStorageEnabled":false,"rotatable":false,"acceptSslCerts":false,"nativeEvents":true,"proxy":{"proxyType":"direct"}}
+[INFO  - 2019-05-21T06:57:36.338Z] SessionManagerReqHand - _postNewSessionCommand - New Session Created: b71326e0-7b95-11e9-92bd-134dc79bb8fe
+[ERROR - 2019-05-21T06:57:40.218Z] Session [b71326e0-7b95-11e9-92bd-134dc79bb8fe] - page.onError - msg: ReferenceError: Can't find variable: string_to_slug
+
+  phantomjs://platform/console++.js:263 in error
+[ERROR - 2019-05-21T06:57:40.219Z] Session [b71326e0-7b95-11e9-92bd-134dc79bb8fe] - page.onError - stack:
+  (anonymous function) (https://www.kyliecosmetics.com/collections/best-sellers:2484)
+  each (https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js:4)
+  buildFilterDom (https://www.kyliecosmetics.com/collections/best-sellers:2483)
+  init (https://www.kyliecosmetics.com/collections/best-sellers:2427)
+
+  phantomjs://platform/console++.js:263 in error
+[ERROR - 2019-05-21T06:58:21.307Z] Session [b71326e0-7b95-11e9-92bd-134dc79bb8fe] - page.onError - msg: ppxo_xo_buttonjs_bootstrap_err [object Object]
+
+  phantomjs://platform/console++.js:263 in error
+[ERROR - 2019-05-21T06:58:21.308Z] Session [b71326e0-7b95-11e9-92bd-134dc79bb8fe] - page.onError - stack:
+  E (https://www.paypalobjects.com/api/checkout.min.js:1)
+
+  phantomjs://platform/console++.js:263 in error
