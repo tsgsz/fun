@@ -114,6 +114,7 @@ class BeikeSpider(BasicSpider):
                 yield self.crawl_communities_in_region(region, district, city)
 
     def crawl_communities_in_region(self, region, district, city):
+        self.logger.info('爬取 region: %s', region)
         communities_url = 'https://{0}.ke.com/xiaoqu/{1}/'.format(city, region)
         return scrapy.Request(
             url = communities_url,
@@ -148,6 +149,7 @@ class BeikeSpider(BasicSpider):
                 yield self.crawl_communities_in_page(i, region, district, city)
 
     def crawl_communities_in_page(self, page, region, district, city):
+        self.logger.info('爬取 region, page: %s %s', region, page)
         community_url = 'https://{0}.ke.com/xiaoqu/{1}/pg{2}'.format(city, region, page)
         return scrapy.Request(
             url = community_url,
@@ -181,7 +183,6 @@ class BeikeSpider(BasicSpider):
             community['district'] = district
             community['region'] = region
             community['link'] = detail_url
-            
             yield scrapy.Request(
                 url = detail_url,
                 headers = self.header(),
@@ -195,6 +196,7 @@ class BeikeSpider(BasicSpider):
         return list_value and len(list_value) >= 1
         
     def parse_community(self, response):
+
         detail_page = response.xpath('//div[@class="xiaoquDetailPage"]')[0]
         title = detail_page.xpath('//div[@data-component="detailHeader"]//div[@class ="title"]/h1/text()')[0].get().strip()
 
@@ -218,6 +220,8 @@ class BeikeSpider(BasicSpider):
         
         response.meta['community']['name'] = title
         
+        self.logger.info('爬取 小区信息, %s', title)
+
         
         # 获取 POI 数据
         # 获取经纬度
@@ -232,17 +236,16 @@ class BeikeSpider(BasicSpider):
         )
         
     def parse_location(self, response):
+
         json = response.json()
         
         if json and json['message'] == 'ok' and len(json['results']) >= 1:
             result = json['results'][0]
             lat = result['location']['lat']
-            lng = result['location']['lng']
-            
-            poi_url = BAIDU_POI.format('地铁站', lat, lng, 0)
-            
-            response['meta']['community']['location'] = result['location']
-            response['meta']['poi_list'] = [
+            lng = result['location']['lng']            
+            self.logger.info('爬取 小区位置, %s %s', response.meta['community']['name'], str(result['location']))
+            response.meta['community']['location'] = result['location']
+            response.meta['poi_list'] = [
                 {'query': '交通设施', 'tags': ['地铁站', '公交站'], 'keys': ['subways', 'buses']},
                 {'query': '医疗', 'tags': ['医院', '诊所', '药店'], 'keys': ['hospital', 'hospital', 'drug_store']},
                 {'query': '教育培训', 'tags': ['小学', '中学', '高等院校', '幼儿园'], 'keys': ['primary_school', 'middle_school', 'collage', 'kindergarten']},
@@ -264,16 +267,18 @@ class BeikeSpider(BasicSpider):
         
         # 获取 POI 信息
         if response.meta.get('poi_info') != None:
-            poi_info = response['meta']['poi_info']
+            poi_info = response.meta['poi_info']
             json = response.json()
+            self.logger.info('爬取 小区poi, %s %s', response.meta['community']['name'], str(poi_info))
+
             
             if json and json['message'] == 'ok' and len(json['results']) > 0:
                 results = json['results']
                 for i, tag in enumerate(poi_info['tags']):
-                    tag_infos = response.meta['community'].get(poi_info['key'][i])
+                    tag_infos = response.meta['community'].get(poi_info['keys'][i])
                     if tag_infos == None:
                         tag_infos = []
-                        response.meta['community'][poi_info['key'][i]] = tag_infos
+                        response.meta['community'][poi_info['keys'][i]] = tag_infos
                     
                     # 根据 tag 的名字筛选
                     tag_infos += [x['name'] for x in filter(lambda x: x['detail_info'].get('tag') and x['detail_info']['tag'].find(tag) != -1, json['results'])]
@@ -284,7 +289,7 @@ class BeikeSpider(BasicSpider):
                 yield scrapy.Request(
                     url = poi_url,
                     headers = self.header(),
-                    callback = self.parse_subway,
+                    callback = self.parse_poi,
                     meta = {
                         'community': response.meta['community'],
                         'location': {'lat': lat, 'lng': lng},
