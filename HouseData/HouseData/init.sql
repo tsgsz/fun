@@ -1,42 +1,28 @@
+CREATE DATABESE /*!32312 IF NOT EXISTS*/ `HouseData` /*!40100 DEFAULT CHARACTER SET utf8 */;
 
-import scrapy
+USE `HouseData`;
 
-from .basic import BasicItem
+DROP TABLE IF EXISTS `Community`;
 
+CREATE TABLE `Community` (
+    `community_id` VARCHAR(20) NOT NULL, 
+    `name` VARCHAR(30) NOT NULL,
+    `city` VARCHAR(10) NOT NULL,
+    
+    `district` VARCHAR(10) NOT NULL,
+    `region` VARCHAR(10) NOT NULL,
+    
+    `real_estate` VARCHAR(30),
+    
+    `real_estate_price` INT,
+    
+    `tags` VARCHAR(500),
+    
+    `avg_unit_price` INT,
 
-class Community(BasicItem):
-    _id = scrapy.Field()
-    # 小区id
-    community_id = scrapy.Field()
+    `location` VARCHAR(200)
     
-    # 名字
-    name = scrapy.Field()
-    
-    # 城市
-    city = scrapy.Field()
-    
-    # 大区域
-    district = scrapy.Field()
-    # 小区域
-    region = scrapy.Field()
-    
-        # 物业
-    real_estate = scrapy.Field()
-    # 物业费用
-    real_estate_price = scrapy.Field()
-    
-    # 标签
-    tags = scrapy.Field()
-    
-    # 平均单价
-    avg_unit_price = scrapy.Field() 
-
-    # 经纬度
-    location = scrapy.Field()
-    
-
-    # 地铁
-    subways = scrapy.Field()
+    `subways` = scrapy.Field()
     # 公交
     buses = scrapy.Field()
     # 医院
@@ -78,6 +64,4 @@ class Community(BasicItem):
     gymnasium = scrapy.Field()
     # 休闲广场
     square = scrapy.Field()
-    
-
-    
+)

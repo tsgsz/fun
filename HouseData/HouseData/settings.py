@@ -52,10 +52,13 @@ ROBOTSTXT_OBEY = False
 
 # Enable or disable downloader middlewares
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
-# DOWNLOADER_MIDDLEWARES = {
-#    'scrapy.contrib.downloadermiddleware.cookies.CookiesMiddleware': 543,
-#    'HouseData.middlewares.ProxyMiddleWare':125
-# }
+DOWNLOADER_MIDDLEWARES = {
+    #'scrapy.contrib.downloadermiddleware.cookies.CookiesMiddleware': 543,
+    #'HouseData.middlewares.RandomProxyMiddleWare':125,
+    'HouseData.middlewares.random_user_agent_middleware.RandomUserAgentMiddleware': 125,
+    'HouseData.middlewares.random_proxy_middleware.RandomProxyMiddleware': 127,
+    'HouseData.middlewares.retry_middleware.RetryMiddleware': 124,
+}
 
 # Enable or disable extensions
 # See https://docs.scrapy.org/en/latest/topics/extensions.html
@@ -65,20 +68,20 @@ ROBOTSTXT_OBEY = False
 
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
-#ITEM_PIPELINES = {
-#    'HouseData.pipelines.HousedataPipeline': 300,
-#}
+ITEM_PIPELINES = {
+    'HouseData.pipelines.mongo_db_pipeline.MongoDbPipeline': 300,
+}
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html
 AUTOTHROTTLE_ENABLED = True
 # The initial download delay
-AUTOTHROTTLE_START_DELAY = 5
+# AUTOTHROTTLE_START_DELAY = 5
 # The maximum download delay to be set in case of high latencies
 AUTOTHROTTLE_MAX_DELAY = 60
 # The average number of requests Scrapy should be sending in parallel to
 # each remote server
-#AUTOTHROTTLE_TARGET_CONCURRENCY = 1.0
+# AUTOTHROTTLE_TARGET_CONCURRENCY = 1.0
 # Enable showing throttling stats for every response received:
 #AUTOTHROTTLE_DEBUG = False
 
@@ -89,3 +92,17 @@ AUTOTHROTTLE_MAX_DELAY = 60
 #HTTPCACHE_DIR = 'httpcache'
 #HTTPCACHE_IGNORE_HTTP_CODES = []
 #HTTPCACHE_STORAGE = 'scrapy.extensions.httpcache.FilesystemCacheStorage'
+
+DBNAME = 'HouseData'
+
+MONGO_DB_URL = 'mongodb://localhost:27017/'
+
+MYSQL_HOST = 'localhost'
+MYSQL_USER = 'youchenjun'
+MYSQL_PASSWD = 'im30123456'
+
+REDIS_HOST = 'localhost'
+REDIS_PORT = 6379
+REDIS_PWD = None
+MIN_PROXY_IN_POOL = 2
+PROXY_GET_NUM = 5
