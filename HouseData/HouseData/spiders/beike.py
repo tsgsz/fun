@@ -185,10 +185,10 @@ class BeikeSpider(scrapy.Spider):
         for li in ul:
             tags = li.xpath('.//div[@class="tagList"]/span//text()').extract()
             detail_url = li.xpath('./a/@href').get()
-            community_id = li.xpath('.//@data-housecode').get()
+            _id = li.xpath('.//@data-housecode').get()
 
             community = Community()
-            community['community_id'] = community_id
+            community['_id'] = _id
             community['tags'] = tags
             community['city'] = city
             community['district'] = district
@@ -252,11 +252,15 @@ class BeikeSpider(scrapy.Spider):
             unit_node = li.xpath('.//div[@class="main-price"]/span[contains(., "均价")]')
             
             name = li.xpath('.//div[@class="resblock-name"]//@title').get() 
+            
+            _id = li.xpath('.//@data-project-name').get()
 
             
             has_avg_price = len(unit_node) != 0
             
             real_estate = RealEstate()
+            
+            real_estate['_id'] = _id
 
             real_estate['tags'] = tags
             real_estate['city'] = city
@@ -355,7 +359,7 @@ class BeikeSpider(scrapy.Spider):
             layout['avg_total_price'] = li.xpath('.//i/text()').get()
             real_estate['layouts'].append(layout)
         
-        yield scrapy.Request(
+        return scrapy.Request(
             url = search_url,
             callback = self.parse_location,
             meta = {
@@ -407,7 +411,7 @@ class BeikeSpider(scrapy.Spider):
         )
         
         yield self.crawl_deals_of_community(community)
-        yield self.crawl_rents_of_community(community)
+        return self.crawl_rents_of_community(community)
         
     def parse_location(self, response):
         # self.logger.info('爬取位置')
@@ -534,7 +538,7 @@ class BeikeSpider(scrapy.Spider):
         return self.crawl_rents_in_page(1, community, total)
 
     
-    def craw_rents_in_page(self, page, community, total):
+    def crawl_rents_in_page(self, page, community, total):
         
         url = 'https://{0}.zu.ke.com/zufang/pg{2}/rs{1}'.format(community['city'], community['name'], page)
         
@@ -563,6 +567,7 @@ class BeikeSpider(scrapy.Spider):
             rent['community'] = community['name']
             rent['link'] =  'https://{0}.zu.ke.com{1}'.format(response.meta['community']['city'], li.xpath('.//@href').get())
             rent['tags'] = li.xpath('.//p[contains(@class, "content__list--item--bottom")]/i/text()').extract()
+            rent['_id'] = li.xpath('.//@data-house_code').get()
             yield scrapy.Request(
                 url = rent['link'],
                 callback = self.parse_rent,
@@ -574,12 +579,12 @@ class BeikeSpider(scrapy.Spider):
         total -= len(ul)
         
         if total > 0:
-            return self.carwl_rents_in_page(page + 1, community, total)
+            return self.crawl_rents_in_page(page + 1, community, total)
     
     def parse_rent(self, response):
         rent = response.meta['rent']
         
-        rent['租赁方式'] = response.xpath('//span[contains(., "租赁方式")]/../text()').get()
+        rent['rent_type'] = response.xpath('//span[contains(., "租赁方式")]/../text()').get()
         
         def get_val(key):
             return response.xpath('//li[contains(., "{0}")]/text()'.format(key)).get().split('：')[-1]
@@ -593,7 +598,7 @@ class BeikeSpider(scrapy.Spider):
         rent['lease_term'] = get_val('租期')
         rent['check_house'] = get_val('看房')
         rent['orientation'] = get_val('朝向')
-        rent['check_in_time'] = get_val('入住')
+        rent['check_in_date'] = get_val('入住')
         rent['elevator'] = get_val('电梯')
         rent['water'] = get_val('用水')
         rent['gas'] = get_val('燃气')
@@ -691,57 +696,64 @@ class BeikeSpider(scrapy.Spider):
             msg = msg[0]
         
             try:
+                
+                def get_val(key):
+                    return msg.xpath('span[contains(.,"{0}")]/label/text()'.format(key)).get().strip()
+                
+                deal['init_price'] = get_val('挂牌价格')
+                deal['deal_cycle'] = get_val('成交周期')
         
-                deal['init_price'] = msg.xpath('span[contains(.,"挂牌价格")]/label/text()').get().strip()
-                deal['deal_cycle'] = msg.xpath('span[contains(.,"成交周期")]/label/text()').get().strip()
-        
-                deal['price_adjustment'] = msg.xpath('span[contains(.,"调价")]/label/text()').get().strip()
-                deal['check_times'] = msg.xpath('span[contains(.,"带看")]/label/text()').get().strip()
-                deal['stars'] = msg.xpath('span[contains(.,"关注")]/label/text()').get().strip()
-                deal['glance_over'] = msg.xpath('span[contains(.,"浏览")]/label/text()').get().strip()
+                deal['price_adjustment'] = get_val('调价')
+                deal['check_times'] = get_val('带看')
+                deal['stars'] = get_val('关注')
+                deal['glance_over'] = get_val('浏览')
             except Exception as e:
                 self.logger.warning('info panel not complete %s', e)
             
         
         base = response.xpath('//div[@class="base"]')[0]
         
-        deal['layout'] = base.xpath('.//span[contains(.,"房屋户型")]/../text()').get().strip()
+                    
+        def get_val(node, key):
+            return node.xpath('.//span[contains(.,"{0}")]/../text()'.format(key)).get().strip()
         
-        deal['building_size'] = base.xpath('.//span[contains(.,"建筑面积")]/../text()').get().strip().replace('㎡', '')
-        deal['actual_size'] = base.xpath('.//span[contains(.,"套内面积")]/../text()').get().strip().replace('㎡', '')
-        level_str = base.xpath('.//span[contains(.,"所在楼层")]/../text()').get().strip()
+        deal['layout'] = get_val(base, '房屋户型')
+        deal['building_size'] = get_val(base, '建筑面积').replace('㎡', '')
+        deal['actual_size'] = get_val(base, '套内面积').replace('㎡', '')
+        level_str = get_val(base, '所在楼层')
         
         deal['level'] = re.findall('(.*)楼层', level_str)
         deal['total_level'] = re.findall('共(.*)层', level_str)
         
-        deal['orientation'] = base.xpath('.//span[contains(.,"房屋朝向")]/../text()').get().strip()
+        deal['orientation'] = get_val(base, '房屋朝向')
         
         try:
             deal['usage'] = float(actual_size) / float(building_size)
         except:
             self.logger.info('房源 %s 的 面积有问题',deal['link'])
-            
-        deal['layout_structure'] = base.xpath('.//span[contains(.,"户型结构")]/../text()').get().strip()
-        
-        deal['building_type'] = base.xpath('.//span[contains(.,"建筑类型")]/../text()').get().strip()
-        deal['building_structure'] = base.xpath('.//span[contains(.,"建筑结构")]/../text()').get().strip()
-        deal['construct_year'] = base.xpath('.//span[contains(.,"建成年代")]/../text()').get().strip()
-        deal['echelon_ratio'] = base.xpath('.//span[contains(.,"梯户比例")]/../text()').get().strip()
-        
-        deal['has_elevator'] = base.xpath('.//span[contains(.,"配备电梯")]/../text()').get().strip()
 
-        deal['decoration'] = base.xpath('.//span[contains(.,"装修情况")]/../text()').get().strip()
+            
+        deal['layout_structure'] = get_val(base, '户型结构')
         
-        deal['heating'] = base.xpath('.//span[contains(.,"供暖方式")]/../text()').get().strip()
+        deal['building_type'] = get_val(base, '建筑类型')
+        deal['building_structure'] = get_val(base, '建筑结构')
+        deal['construct_year'] = get_val(base, '建成年代')
+        deal['echelon_ratio'] = get_val(base, '梯户比例')
+        
+        deal['has_elevator'] = get_val(base, '配备电梯')
+
+        deal['decoration'] = get_val(base, '装修情况')
+        
+        deal['heating'] = get_val(base, '供暖方式')
         
         transaction = response.xpath('//div[@class="transaction"]')[0]
         
-        deal['lianjia_id'] = transaction.xpath('.//span[contains(.,"链家编号")]/../text()').get().strip()
-        deal['deal_class'] = transaction.xpath('.//span[contains(.,"交易权属")]/../text()').get().strip()
-        deal['init_time'] = transaction.xpath('.//span[contains(.,"挂牌时间")]/../text()').get().strip()
-        deal['house_age'] = transaction.xpath('.//span[contains(.,"房屋年限")]/../text()').get().strip()
-        deal['house_usage'] = transaction.xpath('.//span[contains(.,"房屋用途")]/../text()').get().strip()
-        deal['house_ownership'] = transaction.xpath('.//span[contains(.,"房权所属")]/../text()').get().strip()
+        deal['_id'] = get_val(transaction, '链家编号')
+        deal['deal_class'] = get_val(transaction, '交易权属')
+        deal['init_time'] =  get_val(transaction, '挂牌时间')
+        deal['house_age'] =  get_val(transaction, '房屋年限')
+        deal['house_usage'] = get_val(transaction, '房屋用途')
+        deal['house_ownership'] =  get_val(transaction, '房权所属')
         
         deal['tags'] = response.xpath('//div[text()="房源标签"]/../div/a/text()').extract()
         

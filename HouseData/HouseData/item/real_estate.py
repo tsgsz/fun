@@ -2,10 +2,7 @@ import scrapy
 
 from .basic import BasicItem
 
-    
 class RealEstate(BasicItem):
-    _id = scrapy.Field()
-    
     # 名字
     name = scrapy.Field()
     

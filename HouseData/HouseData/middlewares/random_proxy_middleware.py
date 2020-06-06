@@ -32,15 +32,15 @@ class RandomProxyMiddleware:
         # 如果返回的response状态不是200，重新生成当前request对象  
         if response.status != 200:  
             proxy = self.get_random_proxy()  
-            print("this is response ip:"+proxy)  
-            # 对当前reque加上代理  
+            print("this is response ip:" + proxy)  
+            # 对当前request加上代理  
             request.meta['proxy'] = proxy   
             return request  
         return response  
 
     def get_random_proxy(self):  
         '''随机从文件中读取proxy'''  
-        ip, port, _ = self.auto_proxy.pool_get_proxy(1)
+        ip, port, _ = self.auto_proxy.pool_get_proxy()
         proxy = "http://%(host)s:%(port)s" % {
             "host" : ip,
             "port" : port,

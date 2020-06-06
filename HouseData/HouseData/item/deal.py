@@ -3,7 +3,6 @@ import scrapy
 from .basic import BasicItem
 
 class Deal(BasicItem):
-    _id = scrapy.Field()
     # 签约时间
     time = scrapy.Field()
     # 签约单价
@@ -36,8 +35,6 @@ class Deal(BasicItem):
     house_usage = scrapy.Field()
     # 房屋所属: 是否共有
     house_ownership = scrapy.Field()
-    # 链家编号
-    lianjia_id = scrapy.Field()
     
     
     # 小区

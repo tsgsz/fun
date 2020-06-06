@@ -22,7 +22,7 @@ CREATE TABLE `Community` (
 
     `location` VARCHAR(200)
     
-    `subways` = scrapy.Field()
+    `subways` 
     # 公交
     buses = scrapy.Field()
     # 医院

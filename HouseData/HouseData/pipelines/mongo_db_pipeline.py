@@ -21,7 +21,7 @@ class MongoDbPipeline:
     def process_item(self, item, spider):
         cls = item.__class__.__name__
         table = self.db[cls]
-        spider.logger.info(item)
-        table.insert_one(item)
+        
+        table.insert(item)
         return item
     

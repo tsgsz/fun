@@ -95,11 +95,10 @@ class AutoProxy:
             port = jsonObj['port'] 
             return ip, port, jsonObj
 
-    def pool_remove_porxy(self, ip, port, expire, seconds_left, https=0):
+    def pool_remove_porxy(self, ip, port, expire, https=0):
         
         proxy = {'ip': ip, 'port': port, 'expire': expire}
         expire_stamp = self.timestringtotimestamp(expire) - self.expire_time_shift
-        self.logger.info(sys._getframe().f_code.co_name + ' - ' + u'' + str(proxy) + ' seconds_left:'+str(seconds_left))    
         
         self.redis_proxy.zremrangebyscore(self.redis_key[https], expire_stamp, expire_stamp)  
 
@@ -111,7 +110,7 @@ class AutoProxy:
         proxy = str({'ip':ip, 'port':port, 'expire':expire})
         expire_stamp = self.timestringtotimestamp(expire) - self.expire_time_shift
                 
-        self.logger.info(sys._getframe().f_code.co_name + ' - ' + u'' + str(proxy) + ' seconds_left:'+str(seconds_left))    
+        print(' seconds_left:'+ str(seconds_left))    
         
         self.redis_proxy.zadd(self.redis_key[https], {proxy: expire_stamp})   
         # 坑： python redis zadd的参数，跟 标准redis语法是反的
@@ -126,7 +125,7 @@ class AutoProxy:
         """
         移除过期的proxy。expire_stamp是当前时间戳
         """
-        cur_time = datetime.datetime.today()
+        cur_time = (datetime.datetime.now()+datetime.timedelta(hours=8))
         expire_stamp = float(int(time.mktime(cur_time.timetuple())))
         self.redis_proxy.zremrangebyscore(self.redis_key[https], 0, expire_stamp)   
         
@@ -140,7 +139,6 @@ class AutoProxy:
             return
         response = urllib.request.urlopen(req)
         jsonData = response.read().decode('utf-8')
-        print(jsonData)
         jsonObj = json.loads(jsonData)
         success = False
         if 'success' in jsonObj:
@@ -159,8 +157,9 @@ class AutoProxy:
 
     def seconds_left(self,proxy_valid_time):
         proxy_time = datetime.datetime.strptime(proxy_valid_time, "%Y-%m-%d %H:%M:%S")
-        cur_time = datetime.datetime.today()
+        cur_time = (datetime.datetime.now()+datetime.timedelta(hours=8))
         delta = proxy_time-cur_time
+        print(proxy_time, cur_time)
         return delta.total_seconds()
     
     def timestringtotimestamp(self,timestr):

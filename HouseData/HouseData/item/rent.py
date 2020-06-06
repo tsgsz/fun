@@ -3,7 +3,6 @@ import scrapy
 from .basic import BasicItem
 
 class Rent(BasicItem):
-    _id = scrapy.Field()
     # 名字
     name = scrapy.Field()
     # 面积
@@ -34,6 +33,8 @@ class Rent(BasicItem):
     # compelete_facility = scrapy.Field()
     # 社区
     community = scrapy.Field()
+    # 供电
+    electricity = scrapy.Field()
     
 
     

@@ -13,7 +13,7 @@ class RetryMiddleware(SysRetry):
         if response.status in self.retry_http_codes:
             reason = response_status_message(response.status)
             time.sleep(random.randint(3, 5))
-            self.logger.warning('返回值异常, 进行重试...')
+            spider.logger.warning('返回值异常, 进行重试...')
             return self._retry(request, reason, spider) or response
         return response
 
@@ -23,7 +23,7 @@ class RetryMiddleware(SysRetry):
         if not request.meta.get('dont_retry', False):
             time.sleep(random.randint(3, 5))
             
-            self.logger.warning('连接异常, 进行重试...')
-            self.logger.info('异常如下:', exception)
+            spider.logger.warning('连接异常, 进行重试...')
+            spider.logger.info('异常如下:', exception)
             
             return self._retry(request, exception, spider)

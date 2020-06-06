@@ -5,10 +5,6 @@ from .basic import BasicItem
 
 
 class Community(BasicItem):
-    _id = scrapy.Field()
-    # 小区id
-    community_id = scrapy.Field()
-    
     # 名字
     name = scrapy.Field()
     
