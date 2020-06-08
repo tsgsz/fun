@@ -24,6 +24,7 @@ class RandomProxyMiddleware:
     def process_request(self, request, spider):  
         '''对request对象加上proxy'''  
         proxy = self.get_random_proxy()  
+        spider.logger.debug(proxy)
         request.meta['proxy'] = proxy   
 
 
@@ -31,10 +32,7 @@ class RandomProxyMiddleware:
         '''对返回的response处理'''  
         # 如果返回的response状态不是200，重新生成当前request对象  
         if response.status != 200:  
-            proxy = self.get_random_proxy()  
-            print("this is response ip:" + proxy)  
-            # 对当前request加上代理  
-            request.meta['proxy'] = proxy   
+            self.process_request(request, spider)
             return request  
         return response  
 

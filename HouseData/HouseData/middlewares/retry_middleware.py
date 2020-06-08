@@ -12,7 +12,7 @@ class RetryMiddleware(SysRetry):
             return response
         if response.status in self.retry_http_codes:
             reason = response_status_message(response.status)
-            time.sleep(random.randint(3, 5))
+            time.sleep(random.randint(10, 20))
             spider.logger.warning('返回值异常, 进行重试...')
             return self._retry(request, reason, spider) or response
         return response
