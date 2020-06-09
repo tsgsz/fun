@@ -9,8 +9,6 @@ from ..item.real_estate import RealEstate
 from ..item.rent import Rent
 
 
-DISTRICT_region_XPATH = '//div[3]/div[1]/dl[2]/dd/div/div[2]/a'
-CITY_DISTRICT_XPATH = '///div[3]/div[1]/dl[2]/dd/div/div/a'
 
 BAIDU_SEARCH = 'http://api.map.baidu.com/place/v2/search?query={0}&ttag=住宅&region={1}&output=json&ak=MQMeFXHTVvCx0hffjXCTj7mrqKhMnpTH&city_limit=true&page_size=1'
 BAIDU_POI = 'http://api.map.baidu.com/place/v2/search?query="{0}"&location={1},{2}&radius=2000&output=json&ak=MQMeFXHTVvCx0hffjXCTj7mrqKhMnpTH&scope=2&page_size=20&radius_limit=true&page_num={3}'
@@ -43,14 +41,18 @@ class BeikeSpider(scrapy.Spider):
     name = 'beike'
     allowed_domains = ['ke.com', 'baidu.com']
 
-    chinese_district_dict = dict()     # 城市代码和中文名映射
-    chinese_region_dict = dict()       # 版块代码和中文名映射
     chinese_region_dict = dict()
 
+    crawl_community_code = 0b1000
+    crawl_real_estate_code = 0b0100
+    crawl_deal_code = 0b0010
+    crawl_rent_code = 0b0001
 
-    def __init__(self, cities='bj', *args, **kwargs):
+    def __init__(self, cities='bj', mode='0b1111', *args, **kwargs):
         super(BeikeSpider, self).__init__()
+        self.mode = int(mode)
         self.cities = cities.split(',')
+        
         self.start_urls = ['https://{0}.ke.com'.format(self.cities[0])]
 
     def parse(self, response):
@@ -59,7 +61,6 @@ class BeikeSpider(scrapy.Spider):
         ret = []
         for city in self.cities:
             ret.append(self.crawl_districts_of_city(city))
-            
         return ret
     
     
@@ -91,8 +92,6 @@ class BeikeSpider(scrapy.Spider):
             ret.append(self.crawl_regions_in_district(name, city))
             
         return ret
-            
-
 
 
     # 爬取地区
@@ -120,8 +119,12 @@ class BeikeSpider(scrapy.Spider):
             if region != district:
                 chinese_region = link.extract()
                 self.chinese_region_dict[region] = chinese_region
-                ret.append(self.crawl_communities_in_region(region, district, city))
-                ret.append(self.crawl_real_estates_in_region(region, district, city))
+                
+                if self.mode & self.crawl_community_code:
+                    ret.append(self.crawl_communities_in_region(region, district, city))
+                    
+                if self.mode & self.crawl_real_estate_code:
+                    ret.append(self.crawl_real_estates_in_region(region, district, city))
         return ret
     
     
@@ -182,7 +185,7 @@ class BeikeSpider(scrapy.Spider):
         
         for li in ul:
             tags = li.xpath('.//div[@class="resblock-tag"]/span/text()').extract()
-            detail_url = 'http://{0}.fang.ke.com'.format(city) + li.xpath('a/@href').get()
+            detail_url = 'https://{0}.fang.ke.com'.format(city) + li.xpath('a/@href').get()
             unit_node = li.xpath('.//div[@class="main-price"]/span[contains(., "均价")]')
             
             name = li.xpath('.//div[@class="resblock-name"]//@title').get() 
@@ -214,7 +217,7 @@ class BeikeSpider(scrapy.Spider):
         real_estate = response.meta['real_estate']
         real_estate['open_date'] = response.xpath('//div[@class="open-date"]/span[@class="content"]/text()').get()
         return scrapy.Request(
-            url = real_estate['link'] + '/xiangqing/',
+            url = real_estate['link'] + 'xiangqing',
             callback = self.parse_real_estate_detail,
             meta = {
                 'real_estate': real_estate
@@ -254,7 +257,7 @@ class BeikeSpider(scrapy.Spider):
         real_estate['electricity'] = get_val('供电')
         return [
             scrapy.Request(
-            url = real_estate['link'] + '/huxingtu',
+            url = real_estate['link'] + 'huxingtu',
             callback = self.parse_real_estate_layouts,
             meta = {
                 'real_estate': real_estate

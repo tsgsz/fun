@@ -8,7 +8,7 @@ import random
 import sys
 import json
 
-SHIFT_TIME = 8
+SHIFT_TIME = 0
 
 class AutoProxy:
     """

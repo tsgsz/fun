@@ -9,10 +9,10 @@
 #     https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #     https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 
-BOT_NAME = 'HouseData'
+BOT_NAME = 'house_data'
 
-SPIDER_MODULES = ['HouseData.spiders']
-NEWSPIDER_MODULE = 'HouseData.spiders'
+SPIDER_MODULES = ['house_data.spiders']
+NEWSPIDER_MODULE = 'house_data.spiders'
 
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
@@ -21,7 +21,8 @@ NEWSPIDER_MODULE = 'HouseData.spiders'
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = False
 
-LOG_LEVEL = 'INFO'
+LOG_LEVEL = 'DEBUG'
+LOG_FILE = 'house_data.log'
 
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
 CONCURRENT_REQUESTS = 4096
@@ -31,8 +32,8 @@ CONCURRENT_REQUESTS = 4096
 # See also autothrottle settings and docs
 DOWNLOAD_DELAY = 1
 # The download delay setting will honor only one of:
-CONCURRENT_REQUESTS_PER_DOMAIN = 16
-CONCURRENT_REQUESTS_PER_IP = 16
+CONCURRENT_REQUESTS_PER_DOMAIN = 8
+CONCURRENT_REQUESTS_PER_IP = 8
 
 # Disable cookies (enabled by default)
 COOKIES_ENABLED = False
@@ -57,9 +58,9 @@ COOKIES_ENABLED = False
 DOWNLOADER_MIDDLEWARES = {
     #'scrapy.contrib.downloadermiddleware.cookies.CookiesMiddleware': 543,
     #'HouseData.middlewares.RandomProxyMiddleWare':125,
-    'HouseData.middlewares.random_user_agent_middleware.RandomUserAgentMiddleware': 125,
-    'HouseData.middlewares.random_proxy_middleware.RandomProxyMiddleware': 127,
-#    'HouseData.middlewares.retry_middleware.RetryMiddleware': 124,
+    'house_data.middlewares.random_user_agent_middleware.RandomUserAgentMiddleware': 125,
+    #'house_data.middlewares.random_proxy_middleware.RandomProxyMiddleware': 127,
+    #'HouseData.middlewares.retry_middleware.RetryMiddleware': 124,
 }
 
 # Enable or disable extensions
@@ -71,19 +72,19 @@ DOWNLOADER_MIDDLEWARES = {
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
-    'HouseData.pipelines.mongo_db_pipeline.MongoDbPipeline': 300,
+    'house_data.pipelines.mongo_db_pipeline.MongoDbPipeline': 300,
 }
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html
 AUTOTHROTTLE_ENABLED = True
 # The initial download delay
-AUTOTHROTTLE_START_DELAY = 1
+AUTOTHROTTLE_START_DELAY = 3
 # The maximum download delay to be set in case of high latencies
-AUTOTHROTTLE_MAX_DELAY = 20
+AUTOTHROTTLE_MAX_DELAY = 60
 # The average number of requests Scrapy should be sending in parallel to
 # each remote server
-AUTOTHROTTLE_TARGET_CONCURRENCY = 16.0
+AUTOTHROTTLE_TARGET_CONCURRENCY = 8.0
 # Enable showing throttling stats for every response received:
 #AUTOTHROTTLE_DEBUG = False
 
@@ -95,7 +96,7 @@ AUTOTHROTTLE_TARGET_CONCURRENCY = 16.0
 #HTTPCACHE_IGNORE_HTTP_CODES = []
 #HTTPCACHE_STORAGE = 'scrapy.extensions.httpcache.FilesystemCacheStorage'
 
-DBNAME = 'HouseData'
+DBNAME = 'house_data'
 
 MONGO_DB_URL = 'mongodb://localhost:27017/'
 
@@ -108,3 +109,6 @@ REDIS_PORT = 6379
 REDIS_PWD = None
 MIN_PROXY_IN_POOL = 2
 PROXY_GET_NUM = 5
+
+
+RETRY_TIMES = 10
