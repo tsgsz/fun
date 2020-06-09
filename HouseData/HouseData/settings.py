@@ -9,7 +9,7 @@
 #     https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #     https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 
-BOT_NAME = 'play'
+BOT_NAME = 'HouseData'
 
 SPIDER_MODULES = ['HouseData.spiders']
 NEWSPIDER_MODULE = 'HouseData.spiders'
@@ -59,7 +59,7 @@ DOWNLOADER_MIDDLEWARES = {
     #'HouseData.middlewares.RandomProxyMiddleWare':125,
     'HouseData.middlewares.random_user_agent_middleware.RandomUserAgentMiddleware': 125,
     'HouseData.middlewares.random_proxy_middleware.RandomProxyMiddleware': 127,
-    'HouseData.middlewares.retry_middleware.RetryMiddleware': 124,
+#    'HouseData.middlewares.retry_middleware.RetryMiddleware': 124,
 }
 
 # Enable or disable extensions
@@ -106,5 +106,5 @@ MYSQL_PASSWD = 'im30123456'
 REDIS_HOST = 'localhost'
 REDIS_PORT = 6379
 REDIS_PWD = None
-MIN_PROXY_IN_POOL = 5
-PROXY_GET_NUM = 10
+MIN_PROXY_IN_POOL = 2
+PROXY_GET_NUM = 5

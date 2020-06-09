@@ -13,7 +13,7 @@ DISTRICT_region_XPATH = '//div[3]/div[1]/dl[2]/dd/div/div[2]/a'
 CITY_DISTRICT_XPATH = '///div[3]/div[1]/dl[2]/dd/div/div/a'
 
 BAIDU_SEARCH = 'http://api.map.baidu.com/place/v2/search?query={0}&ttag=住宅&region={1}&output=json&ak=MQMeFXHTVvCx0hffjXCTj7mrqKhMnpTH&city_limit=true&page_size=1'
-BAIDU_POI = 'http://api.map.baidu.com/place/v2/search?query="{0}"&location={1},{2}&radius=2000&output=json&ak=MQMeFXHTVvCx0hffjXCTj7mrqKhMnpTH&scope=2&page_size=10&radius_limit=true&page_num={3}'
+BAIDU_POI = 'http://api.map.baidu.com/place/v2/search?query="{0}"&location={1},{2}&radius=2000&output=json&ak=MQMeFXHTVvCx0hffjXCTj7mrqKhMnpTH&scope=2&page_size=20&radius_limit=true&page_num={3}'
 
 CITY_DICT = {
     'bj': '北京',
@@ -56,11 +56,17 @@ class BeikeSpider(scrapy.Spider):
     def parse(self, response):
         #暂时不需要登录
 
+        ret = []
         for city in self.cities:
-            yield self.crawl_districts_of_city(city)
-
+            ret.append(self.crawl_districts_of_city(city))
+            
+        return ret
+    
+    
+    # 爬取区块
     def crawl_districts_of_city(self, city):
         district_url = 'https://{0}.ke.com/xiaoqu'.format(city)
+        
         return scrapy.Request(
             url = district_url,
             callback = self.parse_districts,
@@ -68,8 +74,6 @@ class BeikeSpider(scrapy.Spider):
                 'city': city
             }
         )
-        
-
     def parse_districts(self, response):
         context = response.xpath(CITY_DISTRICT_XPATH)
         en_names = list()
@@ -79,15 +83,19 @@ class BeikeSpider(scrapy.Spider):
             link = ele.attrib['href']
             en_names.append(link.split('/')[-2])
             ch_names.append(ele.xpath('.//text()')[0])
+            
+        ret = []
 
         for i, name in enumerate(en_names):
             self.chinese_district_dict[name] = ch_names[i]
-            # return self.crawl_regions_in_district(name, city)
-            yield self.crawl_regions_in_district(name, city)
+            ret.append(self.crawl_regions_in_district(name, city))
+            
+        return ret
             
 
 
 
+    # 爬取地区
     def crawl_regions_in_district(self, district, city):
         region_url = 'https://{0}.ke.com/xiaoqu/{1}'.format(city, district)
         return scrapy.Request(
@@ -98,11 +106,13 @@ class BeikeSpider(scrapy.Spider):
                 'district': district
             }
         )
-
     def parse_regions(self, response):
         context = response.xpath(DISTRICT_region_XPATH)
         district = response.meta['district']
         city = response.meta['city']
+        
+        ret = []
+        
         for link in context:
             relative_link = link.attrib['href']
             relative_link = relative_link[:-1]
@@ -110,9 +120,12 @@ class BeikeSpider(scrapy.Spider):
             if region != district:
                 chinese_region = link.extract()
                 self.chinese_region_dict[region] = chinese_region
-                yield self.crawl_communities_in_region(region, district, city)
-                yield self.crawl_real_estates_in_region(region, district, city)
-                
+                ret.append(self.crawl_communities_in_region(region, district, city))
+                ret.append(self.crawl_real_estates_in_region(region, district, city))
+        return ret
+    
+    
+    # 爬取楼盘
     def crawl_real_estates_in_region(self, region, district, city):
         real_estates_url = 'https://{0}.fang.ke.com/loupan/{1}/'.format(city, region)
         return scrapy.Request(
@@ -124,11 +137,163 @@ class BeikeSpider(scrapy.Spider):
                 'region': region
             }
         )
+    def parse_real_estates(self, response):
+        total = int(response.xpath('//span[text()="为您找到"]/../span[@class="value"]/text()').get())
+        if total == 0:
+            return None
+        district = response.meta['district']
+        city = response.meta['city']
+        region = response.meta['region']
+
+        return self.crawl_real_estates_in_page(1, region, district, city, total)
+    def crawl_real_estates_in_page(self, page, region, district, city, total):
+        real_estate_url = 'https://{0}.fang.ke.com/loupan/{1}/pg{2}'.format(city, region, page)
+        return scrapy.Request(
+            url = real_estate_url,
+            callback = self.parse_real_estates_in_page,
+            meta = {
+                'city': city,
+                'district': district,
+                'region': region,
+                'total': total,
+                'page': page
+            }
+        )
+    def parse_real_estates_in_page(self, response):
+        district = response.meta['district']
+        city = response.meta['city']
+        region = response.meta['region']
+        
+        total = response.meta['total']
+        page = response.meta['page']     
+        end_flag = response.xpath('//ul[@class="resblock-list-wrapper"]/li[text()="猜你喜欢"]')
+        
+        if len(end_flag) == 0:
+            ul = response.xpath('//ul[@class="resblock-list-wrapper"]/li')
+        else:
+            ul = end_flag.xpath('./preceding-sibling::li')
+          
+        ret = []
+        
+        total -= len(ul)
+        
+        if total > 0:
+            ret.append(self.crawl_real_estates_in_page(page + 1, region, district, city, total))
+        
+        for li in ul:
+            tags = li.xpath('.//div[@class="resblock-tag"]/span/text()').extract()
+            detail_url = 'http://{0}.fang.ke.com'.format(city) + li.xpath('a/@href').get()
+            unit_node = li.xpath('.//div[@class="main-price"]/span[contains(., "均价")]')
+            
+            name = li.xpath('.//div[@class="resblock-name"]//@title').get() 
+            
+            _id = li.xpath('.//@data-project-name').get()
+            has_avg_price = len(unit_node) != 0
+            real_estate = RealEstate()
+            real_estate['_id'] = _id
+
+            real_estate['tags'] = tags
+            real_estate['city'] = city
+            real_estate['district'] = district
+            real_estate['region'] = region
+            real_estate['link'] = detail_url
+            real_estate['name'] = name
+            
+            if has_avg_price:
+                real_estate['avg_unit_price'] = unit_node.xpath('./preceding-sibling::span/text()').get().strip()
+            
+            ret.append(scrapy.Request(
+                url = detail_url,
+                callback = self.parse_real_estate,
+                meta = {
+                    'real_estate': real_estate
+                }
+            ))
+        return ret
+    def parse_real_estate(self, response):
+        real_estate = response.meta['real_estate']
+        real_estate['open_date'] = response.xpath('//div[@class="open-date"]/span[@class="content"]/text()').get()
+        return scrapy.Request(
+            url = real_estate['link'] + '/xiangqing/',
+            callback = self.parse_real_estate_detail,
+            meta = {
+                'real_estate': real_estate
+            }
+        )
+    def parse_real_estate_detail(self, response):
+        real_estate = response.meta['real_estate']
+        infos = response.xpath('//ul[@class="x-box"]/li')
+        
+        def get_val(name):
+            x = infos.xpath('./span[contains(., "{0}")]/../span[@class="label-val"]/span/text()'.format(name)).get()
+            return x.strip() if x else ''
+        
+        avg_unit_price = get_val('参考价格')
+
+        if avg_unit_price and avg_unit_price.find("均价") != -1:
+            real_estate['avg_unit_price'] = avg_unit_price.replace(u'均价', '').replace(u'元/平', '').strip()
+            
+        real_estate['real_estate'] = get_val('物业公司')
+        
+        p = get_val('物业费')
+        if p:
+            real_estate['real_estate_price'] = p.replace('元/m²/月', '')
+            
+        real_estate['estate_type'] = get_val('物业类型')
+        real_estate['building_type'] = get_val('建筑类型')
+        real_estate['floor_area'] = get_val('占地面积').replace('㎡', '')
+        real_estate['floor_space'] = get_val('建筑面积').replace('㎡', '')
+        real_estate['house_num'] = get_val('规划户数')
+        real_estate['property_right_years'] = get_val('产权年限')
+        real_estate['latest_transfer'] = get_val('最近交房')
+        real_estate['greening_rate'] = get_val('绿化率')
+        real_estate['floor_area_rate'] = get_val('容积率')
+        real_estate['parking_place_ratio'] = get_val('车位配比')
+        real_estate['heating'] = get_val('供暖方式')
+        real_estate['water'] = get_val('供水')
+        real_estate['electricity'] = get_val('供电')
+        return [
+            scrapy.Request(
+            url = real_estate['link'] + '/huxingtu',
+            callback = self.parse_real_estate_layouts,
+            meta = {
+                'real_estate': real_estate
+            }
+        )]
+        
+        
+    def parse_real_estate_layouts(self, response):
+        real_estate = response.meta['real_estate']
+        real_estate['layouts'] = list()
+        layouts = response.xpath('//ul[contains(@class, "item-list")]/li')
+        for li in layouts:
+            layout = dict()
+            info = li.xpath('.//ul/li/text()').extract()
+            for i in info:
+                kv = i.split('：')
+                if kv[0].strip() == '建面':
+                    layout['building_size'] = kv[1].strip().replace('㎡', '')
+                elif kv[0].strip() == '居室':
+                    layout['layout'] = kv[1].strip()
+                
+            
+            layout['avg_total_price'] = li.xpath('.//i/text()').get()
+            real_estate['layouts'].append(layout)
+            
+        cn_city = CITY_DICT[real_estate['city']]
+        search_url = BAIDU_SEARCH.format(real_estate['name'], cn_city) 
+        return [
+            scrapy.Request(
+            url = search_url,
+            callback = self.parse_location,
+            meta = {
+                'item': real_estate
+            }
+        )]
         
                 
-
+          
     def crawl_communities_in_region(self, region, district, city):
-        # self.logger.info('爬取 region: %s', region)
         communities_url = 'https://{0}.ke.com/xiaoqu/{1}/'.format(city, region)
         return scrapy.Request(
             url = communities_url,
@@ -152,20 +317,21 @@ class BeikeSpider(scrapy.Spider):
         district = response.meta['district']
         city = response.meta['city']
         region = response.meta['region']
+        
+        ret = []
 
         page_datas = content.xpath('.//@page-data')
         if len(page_datas) != 0:
             total_page = j.loads(page_datas.get())['totalPage']
-            # total_page = 1
             for i in range(1, total_page + 1):
-                yield self.crawl_communities_in_page(i, region, district, city)
+                ret.append(self.crawl_communities_in_page(i, region, district, city))
         else:
-            yield self.parse_communities_in_page(response)
+            ret.append(self.parse_communities_in_page(response))
+        return ret
         
 
         
     def crawl_communities_in_page(self, page, region, district, city):
-        # self.logger.info('爬取 region, page: %s %s', region, page)
         community_url = 'https://{0}.ke.com/xiaoqu/{1}/pg{2}'.format(city, region, page)
         return scrapy.Request(
             url = community_url,
@@ -183,6 +349,7 @@ class BeikeSpider(scrapy.Spider):
         region = response.meta['region']
         content = response.xpath('//div[@class="content"]')[0]
         ul = content.xpath('.//ul[@class="listContent"]//li')
+        ret = []
         for li in ul:
             tags = li.xpath('.//div[@class="tagList"]/span//text()').extract()
             detail_url = li.xpath('./a/@href').get()
@@ -195,185 +362,15 @@ class BeikeSpider(scrapy.Spider):
             community['district'] = district
             community['region'] = region
             community['link'] = detail_url
-            yield scrapy.Request(
+            ret.append(scrapy.Request(
                 url = detail_url,
                 callback = self.parse_community,
                 meta = {
                     'community': community
                 }
-            )
-
-    def parse_real_estates(self, response):
-        total = int(response.xpath('//span[text()="为您找到"]/../span[@class="value"]/text()').get())
-
-        
-        if total == 0:
-            return None
-
-        district = response.meta['district']
-        city = response.meta['city']
-        region = response.meta['region']
-
-        return self.crawl_real_estates_in_page(1, region, district, city, total)
-
-    def crawl_real_estates_in_page(self, page, region, district, city, total):
-        # self.logger.info('爬取 region, page: %s %s', region, page)
-        real_estate_url = 'https://{0}.fang.ke.com/loupan/{1}/pg{2}'.format(city, region, page)
-        return scrapy.Request(
-            url = real_estate_url,
-            callback = self.parse_real_estates_in_page,
-            meta = {
-                'city': city,
-                'district': district,
-                'region': region,
-                'total': total,
-                'page': page
-            }
-        )
-
-    def parse_real_estates_in_page(self, response):
-        district = response.meta['district']
-        city = response.meta['city']
-        region = response.meta['region']
-        
-        total = response.meta['total']
-        page = response.meta['page']
-        
-        
-        end_flag = response.xpath('//ul[@class="resblock-list-wrapper"]/li[text()="猜你喜欢"]')
-        
-        if len(end_flag) == 0:
-            ul = response.xpath('//ul[@class="resblock-list-wrapper"]/li')
-        else:
-            ul = end_flag.xpath('./preceding-sibling::li')
-            
-        for li in ul:
-            tags = li.xpath('.//div[@class="resblock-tag"]/span/text()').extract()
-            detail_url = 'http://{0}.fang.ke.com'.format(city) + li.xpath('a/@href').get()
-            unit_node = li.xpath('.//div[@class="main-price"]/span[contains(., "均价")]')
-            
-            name = li.xpath('.//div[@class="resblock-name"]//@title').get() 
-            
-            _id = li.xpath('.//@data-project-name').get()
-
-            
-            has_avg_price = len(unit_node) != 0
-            
-            real_estate = RealEstate()
-            
-            real_estate['_id'] = _id
-
-            real_estate['tags'] = tags
-            real_estate['city'] = city
-            real_estate['district'] = district
-            real_estate['region'] = region
-            real_estate['link'] = detail_url
-            real_estate['name'] = name
-            
-            if has_avg_price:
-                real_estate['avg_unit_price'] = unit_node.xpath('./preceding-sibling::span/text()').get().strip()
-            
-            yield scrapy.Request(
-                url = detail_url,
-                callback = self.parse_real_estate,
-                meta = {
-                    'real_estate': real_estate
-                }
-            )
-            
-        total -= len(ul)
-        
-        if total > 0:
-            yield self.crawl_real_estates_in_page(page + 1, region, district, city, total)
-        
+            ))
 
 
-    
-    def parse_real_estate(self, response):
-        real_estate = response.meta['real_estate']
-        real_estate['open_date'] = response.xpath('//div[@class="open-date"]/span[@class="content"]/text()').get()
-        return scrapy.Request(
-            url = real_estate['link'] + '/xiangqing/',
-            callback = self.parse_real_estate_detail,
-            meta = {
-                'real_estate': real_estate
-            }
-        )
-    
-    
-    def parse_real_estate_detail(self, response):
-        real_estate = response.meta['real_estate']
-        
-        infos = response.xpath('//ul[@class="x-box"]/li')
-        
-        def get_val(name):
-            x = infos.xpath('./span[contains(., "{0}")]/../span[@class="label-val"]/span/text()'.format(name)).get()
-            return x.strip() if x else ''
-        
-        avg_unit_price = get_val('参考价格')
-        
-        if avg_unit_price and avg_unit_price.find("均价") != -1:
-            real_estate['avg_unit_price'] = avg_unit_price.replace(u'均价', '').replace(u'元/平', '').strip()
-            
-        real_estate['real_estate'] = get_val('物业公司')
-        
-        p = get_val('物业费')
-        if p:
-            real_estate['real_estate_price'] = p.replace('元/m²/月', '')
-            
-        real_estate['estate_type'] = get_val('物业类型')
-        real_estate['building_type'] = get_val('建筑类型')
-        real_estate['floor_area'] = get_val('占地面积').replace('㎡', '')
-        real_estate['floor_space'] = get_val('建筑面积').replace('㎡', '')
-        real_estate['house_num'] = get_val('规划户数')
-        real_estate['property_right_years'] = get_val('产权年限')
-        real_estate['latest_transfer'] = get_val('最近交房')
-        real_estate['greening_rate'] = get_val('绿化率')
-        real_estate['floor_area_rate'] = get_val('容积率')
-        real_estate['parking_place_ratio'] = get_val('车位配比')
-        real_estate['heating'] = get_val('供暖方式')
-        real_estate['water'] = get_val('供水')
-        real_estate['electricity'] = get_val('供电')
-        return scrapy.Request(
-            url = real_estate['link'] + '/huxingtu',
-            callback = self.parse_real_estate_layouts,
-            meta = {
-                'real_estate': real_estate
-            }
-        )
-        
-        
-    def parse_real_estate_layouts(self, response):
-        real_estate = response.meta['real_estate']
-        
-        real_estate['layouts'] = list()
-        
-        layouts = response.xpath('//ul[contains(@class, "item-list")]/li')
-        for li in layouts:
-            layout = dict()
-            info = li.xpath('.//ul/li/text()').extract()
-            for i in info:
-                kv = i.split('：')
-                if kv[0].strip() == '建面':
-                    layout['building_size'] = kv[1].strip().replace('㎡', '')
-                elif kv[0].strip() == '居室':
-                    layout['layout'] = kv[1].strip()
-                
-            
-            layout['avg_total_price'] = li.xpath('.//i/text()').get()
-            real_estate['layouts'].append(layout)
-            
-        cn_city = CITY_DICT[real_estate['city']]
-        search_url = BAIDU_SEARCH.format(real_estate['name'], cn_city) 
-        return scrapy.Request(
-            url = search_url,
-            callback = self.parse_location,
-            meta = {
-                'item': real_estate
-            }
-        )
-        
-        
     def parse_community(self, response):
         
         def has_value(list_value): 
@@ -383,7 +380,6 @@ class BeikeSpider(scrapy.Spider):
         title = detail_page.xpath('.//div[@data-component="detailHeader"]//div[@class ="title"]/h1/text()').get().strip()
 
         community = response.meta['community']
-
         community_desc = detail_page.xpath('.//div[contains(@class, "xiaoquDescribe")]')[0]
 
         node = community_desc.xpath('.//span[text() = "物业费用"]//following::span[1]//text()')
@@ -403,27 +399,26 @@ class BeikeSpider(scrapy.Spider):
         
         community['name'] = title
         
-        # self.logger.info('爬取 小区信息, %s', str(response.meta['community']))
-
-        
         # 获取 POI 数据
         # 获取经纬度
         cn_city = CITY_DICT[response.meta['community']['city']]
         search_url = BAIDU_SEARCH.format(title, cn_city) 
         
-        yield scrapy.Request(
+        ret = []
+        
+        ret.append(scrapy.Request(
             url = search_url,
             callback = self.parse_location,
             meta = {
                 'item': community
             }
-        )
+        ))
+        ret.append(self.crawl_deals_of_community(community))
+        ret.append(self.crawl_rents_of_community(community))
         
-        yield self.crawl_deals_of_community(community)
-        yield self.crawl_rents_of_community(community)
+        return ret
         
     def parse_location(self, response):
-        # self.logger.info('爬取位置')
         text = response.body.decode(response.encoding)
         json = j.loads(text)
         
@@ -431,7 +426,6 @@ class BeikeSpider(scrapy.Spider):
             result = json['results'][0]
             lat = result['location']['lat']
             lng = result['location']['lng']            
-            # self.logger.info('爬取 小区位置, %s %s', response.meta['community']['name'], str(result['location']))
             response.meta['item']['location'] = result['location']
             response.meta['poi_list'] = [
                 {'query': '交通设施', 'tags': ['地铁站', '公交车站'], 'keys': ['subways', 'buses']},
@@ -448,7 +442,7 @@ class BeikeSpider(scrapy.Spider):
             return self.parse_poi(response)
             
         else:
-            return response.meta['item']
+            return [response.meta['item']]
     
     def parse_poi_in_page(self, response): 
         loc = response.meta['item']['location'] 
@@ -476,11 +470,11 @@ class BeikeSpider(scrapy.Spider):
                     ]
                 
                 
-                if len(results) == 10:
+                if len(results) == 20:
                     # 有可能下一页
                     page_num = response.meta['page_num'] + 1
                     poi_url = BAIDU_POI.format(poi_info['query'], loc['lat'], loc['lng'], page_num)
-                    return scrapy.Request(
+                    return [scrapy.Request(
                         url = poi_url,
                         callback = self.parse_poi_in_page,
                         meta = {
@@ -489,7 +483,7 @@ class BeikeSpider(scrapy.Spider):
                             'poi_list': response.meta['poi_list'],
                             'page_num': page_num
                         }                
-                    )
+                    )]
                     
         return self.parse_poi(response)
                 
@@ -501,7 +495,7 @@ class BeikeSpider(scrapy.Spider):
         # 所有的 poi信息都获取完了
         if len(response.meta['poi_list']) == 0:
             response.meta['poi_info'] = None
-            return response.meta['item']
+            return [response.meta['item']]
             
         # 获取下一个需要的 POI
         else:            
@@ -510,7 +504,7 @@ class BeikeSpider(scrapy.Spider):
             # 爬取第 0 页面
             poi_url = BAIDU_POI.format(poi_info['query'], loc['lat'], loc['lng'], 0)
             
-            return scrapy.Request(
+            return [scrapy.Request(
                 url = poi_url,
                 callback = self.parse_poi_in_page,
                 meta = {
@@ -520,7 +514,7 @@ class BeikeSpider(scrapy.Spider):
                     'page_num': 0
                 }
                 
-            ) 
+            )]
     
     def crawl_rents_of_community(self, community):
         url = 'https://{0}.zu.ke.com/zufang/rs{1}/'.format(community['city'], community['name']) 
@@ -535,8 +529,6 @@ class BeikeSpider(scrapy.Spider):
 
     
     def parse_rents_of_community(self, response):
-
-
         community = response.meta['community']
         
         total = int(response.xpath('//p[contains(., "为您找到")]/span/text()').get())
@@ -544,13 +536,11 @@ class BeikeSpider(scrapy.Spider):
         if total == 0:
             return None
         
-        return self.crawl_rents_in_page(1, community, total)
+        return [self.crawl_rents_in_page(1, community, total)]
 
     
     def crawl_rents_in_page(self, page, community, total):
-        
         url = 'https://{0}.zu.ke.com/zufang/pg{2}/rs{1}'.format(community['city'], community['name'], page)
-        
         return scrapy.Request(
             url = url,
             callback = self.parse_rents_in_page,
@@ -569,6 +559,11 @@ class BeikeSpider(scrapy.Spider):
         
         ul = response.xpath('//div[@class="content__list"]/div[@class="content__list--item"]')
         
+        ret = []
+        total -= len(ul)
+        if total > 0:
+            ret.push(self.crawl_rents_in_page(page + 1, community, total))
+        
         for li in ul:
             rent = Rent()
             rent['name'] = li.xpath('.//p[contains(@class, "content__list--item--title")]/a/text()').get().strip()
@@ -576,18 +571,17 @@ class BeikeSpider(scrapy.Spider):
             rent['link'] =  'https://{0}.zu.ke.com{1}'.format(response.meta['community']['city'], li.xpath('.//@href').get())
             rent['tags'] = li.xpath('.//p[contains(@class, "content__list--item--bottom")]/i/text()').extract()
             rent['_id'] = li.xpath('.//@data-house_code').get()
-            yield scrapy.Request(
+            ret.append(scrapy.Request(
                 url = rent['link'],
                 callback = self.parse_rent,
                 meta = {
                     'rent': rent
                 }
-            )
+            ))
             
-        total -= len(ul)
-        
-        if total > 0:
-            yield self.crawl_rents_in_page(page + 1, community, total)
+        return ret
+            
+
     
     def parse_rent(self, response):
         rent = response.meta['rent']
@@ -630,7 +624,7 @@ class BeikeSpider(scrapy.Spider):
             pay = get_pay(table)
             rent['pay'].append(pay)
             
-        return rent    
+        return [rent]    
             
     def crawl_deals_of_community(self, community):
         url = 'https://{0}.ke.com/chengjiao/pg{2}rs{1}/'.format(community['city'], community['name'], 1) 
@@ -647,17 +641,17 @@ class BeikeSpider(scrapy.Spider):
         content = response.xpath('//div[@class="leftContent"]')[0]
         total = int(content.xpath('.//div[contains(@class, "total")]/span/text()').get())
         
+        ret = []
         if total != 0:
             page_datas = content.xpath('//@page-data')
             if len(page_datas) != 0:
                 total_page = j.loads(page_datas.get())['totalPage']
-                # total_page = 1
                 for i in range(1, total_page + 1):
-                    yield self.crawl_deals_in_page(i, response.meta['community'])
+                    ret.append(self.crawl_deals_in_page(i, response.meta['community']))
+        return ret
         
     def crawl_deals_in_page(self, page, community):
         url = 'https://{0}.ke.com/chengjiao/pg{2}rs{1}/'.format(community['city'], community['name'], page)
-        
         return scrapy.Request(
             url = url,
             callback = self.parse_deals_in_page,
@@ -670,7 +664,7 @@ class BeikeSpider(scrapy.Spider):
         content = response.xpath('//div[@class="leftContent"]')[0]
         ul = content.xpath('//ul[@class="listContent"]//li')
         community = response.meta['community']
-
+        ret = []
         for li in ul:
             tags = li.xpath('//div[@class="title"]/a/text()').get().strip()
             detail_url = li.xpath('a/@href').get()
@@ -687,13 +681,14 @@ class BeikeSpider(scrapy.Spider):
             deal['price'] = price
             deal['time'] = deal_date
             
-            yield scrapy.Request(
+            ret.append(scrapy.Request(
                 url = detail_url,
                 callback = self.parse_deal,
                 meta = {
                     'deal': deal
                 }
-            )
+            ))
+        return ret
             
     def parse_deal(self, response):
         
@@ -766,5 +761,5 @@ class BeikeSpider(scrapy.Spider):
         
         deal['tags'] = response.xpath('//div[text()="房源标签"]/../div/a/text()').extract()
         
-        return deal
+        return [deal]
         

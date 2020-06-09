@@ -8,6 +8,8 @@ import random
 import sys
 import json
 
+SHIFT_TIME = 8
+
 class AutoProxy:
     """
     Http Proxy代理类。自动获取代理ip，并存入redis。
@@ -125,7 +127,7 @@ class AutoProxy:
         """
         移除过期的proxy。expire_stamp是当前时间戳
         """
-        cur_time = (datetime.datetime.now()+datetime.timedelta(hours=0))
+        cur_time = (datetime.datetime.now()+datetime.timedelta(hours=SHIFT_TIME))
         expire_stamp = float(int(time.mktime(cur_time.timetuple())))
         self.redis_proxy.zremrangebyscore(self.redis_key[https], 0, expire_stamp)   
         
@@ -157,7 +159,7 @@ class AutoProxy:
 
     def seconds_left(self,proxy_valid_time):
         proxy_time = datetime.datetime.strptime(proxy_valid_time, "%Y-%m-%d %H:%M:%S")
-        cur_time = (datetime.datetime.now()+datetime.timedelta(hours=0))
+        cur_time = (datetime.datetime.now()+datetime.timedelta(hours=SHIFT_TIME))
         delta = proxy_time-cur_time
         print(proxy_time, cur_time)
         return delta.total_seconds()

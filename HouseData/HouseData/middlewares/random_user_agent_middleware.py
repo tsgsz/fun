@@ -25,11 +25,12 @@ class RandomUserAgentMiddleware:
     
     def process_request(self,request, spider):  
         '''对request对象加上proxy'''  
-        if len(spider.allowed_domains) >= 1:
-            request.headers['Referer'] = "http://www.{0}".format(spider.allowed_domains[0])
-        else:
-            request.headers['Referer'] = "http://www.baidu.com"
+        
+        allowed_domains = [ "test.com", "baidu.com", "alibaba.com" ]
+        
+        allowed_domains += getattr(spider, 'allowed_domains', [])
             
+        request.headers['Referer'] = "http://www.{0}".format(random.choice(allowed_domains))   
         request.headers["User-Agent"] = self.get_random_agent()
         
     def process_response(self, request, response, spider):  
